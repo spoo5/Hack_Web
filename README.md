@@ -146,7 +146,23 @@ dataweb/
 - Node.js 16+
 - npm or yarn
 
-### 1️⃣ Backend Setup
+### 0️⃣ One-Command Launch (Recommended)
+
+**Windows** – Double-click `start-all.bat`
+
+**Mac / Linux:**
+
+```bash
+chmod +x start-all.sh   # only needed the first time
+./start-all.sh
+```
+
+This starts both the backend (port 8000) and frontend (port 3000) together.  
+Press **Ctrl+C** to stop both servers at once.
+
+---
+
+### 1️⃣ Backend Setup (manual)
 
 ```bash
 cd backend
@@ -174,7 +190,7 @@ Backend runs on: **http://localhost:8000**
 
 > **Note:** Without a `MISTRAL_API_KEY`, the backend still works fully using its built-in rule-based query parser and DuckDB engine. The Mistral AI integration is optional and provides richer NL-to-SQL and answer formatting when available.
 
-### 2️⃣ Frontend Setup
+### 2️⃣ Frontend Setup (manual)
 
 ```bash
 cd frontend

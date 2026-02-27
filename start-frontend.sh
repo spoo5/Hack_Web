@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────
-#  DataSage – start the React / Vite frontend (Mac / Linux)
-# ─────────────────────────────────────────────────────────────────
+# DataSage – start the React / Vite frontend (Mac / Linux)
 set -e
-cd "$(dirname "$0")/frontend"
+cd "$(dirname "$0")/frontend" || exit 1
 
 echo "========================================"
 echo " DataSage – Starting Frontend Server"

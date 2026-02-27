@@ -53,10 +53,10 @@ git clone https://github.com/spoo5/Hack_Web.git
 cd Hack_Web
 
 # Make the script executable (first time only)
-chmod +x start.sh
+chmod +x start-all.sh
 
 # Run both servers
-./start.sh
+./start-all.sh
 ```
 
 ### Windows
@@ -226,7 +226,7 @@ confirm the backend is actually running (it may have crashed on startup).
 
 | Script | OS | What it does |
 |--------|----|-------------|
-| `start.sh` | Mac / Linux | Starts both backend + frontend |
+| `start-all.sh` | Mac / Linux | Starts both backend + frontend |
 | `start-backend.sh` | Mac / Linux | Starts backend only |
 | `start-frontend.sh` | Mac / Linux | Starts frontend only |
 | `start-all.bat` | Windows | Starts both backend + frontend |

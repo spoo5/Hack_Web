@@ -3,11 +3,11 @@
 #  DataSage – launch BOTH backend and frontend (Mac / Linux)
 #
 #  Usage:
-#    chmod +x start.sh          # make executable (first time only)
-#    ./start.sh                 # run
+#    chmod +x start-all.sh          # make executable (first time only)
+#    ./start-all.sh                 # run
 #
 #  Optional – set Mistral AI key for LLM-powered queries:
-#    MISTRAL_API_KEY=sk-... ./start.sh
+#    MISTRAL_API_KEY=sk-... ./start-all.sh
 # ─────────────────────────────────────────────────────────────────
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"

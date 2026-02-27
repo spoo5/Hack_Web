@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────
-#  DataSage – start the FastAPI backend (Mac / Linux)
-# ─────────────────────────────────────────────────────────────────
+# DataSage – start the FastAPI backend (Mac / Linux)
 set -e
-cd "$(dirname "$0")/backend"
+cd "$(dirname "$0")/backend" || exit 1
 
 echo "========================================"
 echo " DataSage – Starting Backend Server"
 echo "========================================"
 
-# Create virtual environment if it doesn't exist yet
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
     python3 -m venv venv
 fi
 
-# Activate
 source venv/bin/activate
 
 echo "Installing / updating dependencies..."
@@ -28,7 +24,7 @@ echo " API docs       → http://localhost:8000/docs"
 echo "========================================"
 echo ""
 
-# Optional Mistral AI key – export before running this script or set it here:
-# export MISTRAL_API_KEY=your_key_here
+# Optional – set Mistral AI key for LLM-powered queries:
+# export MISTRAL_API_KEY=sk-your-key-here
 
 python main.py
