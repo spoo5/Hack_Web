@@ -10,11 +10,18 @@ Before starting, ensure you have:
 
 ---
 
-## 🎯 Method 1: Automated Startup (Windows)
+## 🎯 Method 1: Automated Startup
 
 ### One-Command Launch
 
-Double-click: **`start-all.bat`**
+**Windows** – Double-click: **`start-all.bat`**
+
+**Mac / Linux** – Run in a terminal:
+
+```bash
+chmod +x start-all.sh   # only needed the first time
+./start-all.sh
+```
 
 This will:
 
@@ -24,10 +31,14 @@ This will:
 4. Install Node dependencies (if needed)
 5. Start React frontend on port 3000
 
+Press **Ctrl+C** to stop both servers at once.
+
 ### Individual Servers
 
-- **Backend only:** Double-click `start-backend.bat`
-- **Frontend only:** Double-click `start-frontend.bat`
+| Platform | Backend only | Frontend only |
+|----------|-------------|---------------|
+| Windows  | `start-backend.bat` | `start-frontend.bat` |
+| Mac/Linux | `./start-backend.sh` | `./start-frontend.sh` |
 
 ---
 
