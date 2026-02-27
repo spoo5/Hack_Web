@@ -67,7 +67,44 @@ Both servers start in separate windows automatically.
 
 ---
 
-## 🛠 Step-by-step (manual) setup
+## 🐳 Method 2 – Docker (one-command deploy, no Python/Node needed)
+
+> **Requires:** [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (comes bundled with Docker Desktop).
+
+```bash
+# 1. Clone the repo (skip if you already have it)
+git clone https://github.com/spoo5/Hack_Web.git
+cd Hack_Web
+
+# 2. (Optional) set Mistral AI key
+cp .env.example .env
+#   then edit .env and add your MISTRAL_API_KEY if you have one
+
+# 3. Build & start both containers
+docker compose up --build
+```
+
+That's it. Docker builds the images, starts the services, and wires them together.
+
+| URL | What it is |
+|-----|-----------|
+| http://localhost:3000 | React frontend |
+| http://localhost:8000 | FastAPI backend |
+| http://localhost:8000/docs | Swagger API docs |
+
+**Stop everything:** press `Ctrl+C`, then run `docker compose down`.
+
+**Run in the background (detached):**
+
+```bash
+docker compose up --build -d
+# Later, to stop:
+docker compose down
+```
+
+---
+
+## 🛠 Method 3 – Step-by-step (manual) setup
 
 ### Terminal 1 – Backend
 

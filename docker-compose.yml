@@ -1,0 +1,23 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: datasage-backend
+    restart: unless-stopped
+    environment:
+      # Optional: set your Mistral AI key for LLM-enhanced queries
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+    ports:
+      # Expose backend directly for local API debugging.
+      # Remove this in production to route all traffic through nginx.
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: datasage-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend

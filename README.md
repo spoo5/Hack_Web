@@ -148,17 +148,24 @@ dataweb/
 
 ### 0️⃣ One-Command Launch (Recommended)
 
-**Windows** – Double-click `start-all.bat`
-
-**Mac / Linux:**
+**Option A – Docker** *(no Python or Node.js required on your machine)*
 
 ```bash
-chmod +x start-all.sh   # only needed the first time
-./start-all.sh
+docker compose up --build
 ```
 
-This starts both the backend (port 8000) and frontend (port 3000) together.  
-Press **Ctrl+C** to stop both servers at once.
+Frontend → **http://localhost:3000** | Backend → **http://localhost:8000**
+
+**Option B – Shell script**
+
+```bash
+# Mac/Linux
+chmod +x start-all.sh && ./start-all.sh
+
+# Windows – double-click start-all.bat
+```
+
+Press **Ctrl+C** to stop.
 
 ---
 
