@@ -25,9 +25,9 @@ _NL_TO_SQL_PROMPT = (
     "Rules:\n"
     "- Return ONLY the SQL, no markdown fences, no explanation.\n"
     "- Use only SELECT or WITH statements.\n"
-    "- For churn rate use: "
-    "(COUNT(*) FILTER (WHERE <churned_col> = true) * 100.0 / NULLIF(COUNT(*), 0)) "
-    "when the dataset has a churn column.\n"
+    "- For binary rate calculations use: "
+    "(COUNT(*) FILTER (WHERE <binary_col> = <positive_value>) * 100.0 / NULLIF(COUNT(*), 0)) "
+    "when the dataset has a binary outcome column.\n"
 )
 
 _FORMAT_ANSWER_PROMPT = (
