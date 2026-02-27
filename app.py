@@ -56,8 +56,18 @@ if "cleaning_steps" not in st.session_state:
 # Cache the Mistral client; recreate only when the key changes
 _cached_key = st.session_state.get("mistral_api_key_cached", "")
 if mistral_api_key and mistral_api_key != _cached_key:
-    st.session_state.mistral_client = get_client(mistral_api_key)
-    st.session_state.mistral_api_key_cached = mistral_api_key
+    try:
+        st.session_state.mistral_client = get_client(mistral_api_key)
+        st.session_state.mistral_api_key_cached = mistral_api_key
+    except ImportError:
+        st.error(
+            "❌ The **mistralai** package is not installed.\n\n"
+            "Run the following command in your terminal and restart the app:\n"
+            "```\npip install mistralai\n```\n\n"
+            "Or install all dependencies at once:\n"
+            "```\npip install -r requirements.txt\n```"
+        )
+        st.stop()
 _llm_client = st.session_state.get("mistral_client") if mistral_api_key else None
 
 PREVIEW_ROWS = 100  # configurable default for the preview section

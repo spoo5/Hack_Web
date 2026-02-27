@@ -69,7 +69,13 @@ class _MistralClient:
     """Thin wrapper around the mistralai SDK."""
 
     def __init__(self, api_key: str) -> None:
-        from mistralai import Mistral  # local import – optional dependency
+        try:
+            from mistralai import Mistral  # local import – optional dependency
+        except ImportError as exc:
+            raise ImportError(
+                "The 'mistralai' package is required. Install it with:\n"
+                "  pip install mistralai"
+            ) from exc
         self._client = Mistral(api_key=api_key)
 
     def generate(self, model: str, prompt: str, json_mode: bool = False) -> str:
