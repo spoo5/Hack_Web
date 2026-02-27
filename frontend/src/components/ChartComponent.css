@@ -1,0 +1,61 @@
+.chart-wrapper {
+  width: 100%;
+  padding: 20px 0;
+}
+
+.chart-placeholder {
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(234, 171, 0, 0.03);
+  border: 2px dashed rgba(234, 171, 0, 0.2);
+  border-radius: 12px;
+  padding: 40px;
+}
+
+.kpi-card {
+  text-align: center;
+  padding: 60px 40px;
+  background: linear-gradient(
+    135deg,
+    rgba(234, 171, 0, 0.1),
+    rgba(234, 171, 0, 0.05)
+  );
+  border: 2px solid rgba(234, 171, 0, 0.3);
+  border-radius: 16px;
+}
+
+.kpi-value {
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--accent-gold);
+  font-family: "DM Mono", monospace;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.kpi-label {
+  font-size: 18px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+/* Recharts custom styling */
+.recharts-wrapper {
+  font-family: "DM Sans", sans-serif;
+}
+
+.recharts-text {
+  fill: #b4b8c5;
+}
+
+.recharts-label {
+  fill: #ffffff;
+  font-size: 14px;
+}
+
+.recharts-legend-item-text {
+  color: #b4b8c5 !important;
+}
