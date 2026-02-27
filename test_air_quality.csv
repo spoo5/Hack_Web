@@ -1,0 +1,6 @@
+Date,City,State,AQI,PM2.5,Temperature
+2024-01-01,Delhi,Delhi,350,180,22
+2024-01-02,Mumbai,Maharashtra,120,50,28
+2024-01-03,Bangalore,Karnataka,80,30,25
+2024-01-04,Chennai,Tamil Nadu,95,40,30
+2024-01-05,Kolkata,West Bengal,200,100,27

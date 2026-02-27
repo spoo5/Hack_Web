@@ -1,0 +1,124 @@
+.confidence-component {
+  padding: 20px 24px;
+  border-radius: 12px;
+  margin-top: 24px;
+}
+
+.confidence-high {
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+}
+
+.confidence-medium {
+  background: rgba(255, 179, 71, 0.1);
+  border: 1px solid rgba(255, 179, 71, 0.3);
+}
+
+.confidence-low {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.confidence-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.confidence-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.confidence-high .confidence-icon {
+  background: rgba(78, 205, 196, 0.2);
+  color: #4ecdc4;
+}
+
+.confidence-medium .confidence-icon {
+  background: rgba(255, 179, 71, 0.2);
+  color: #ffb347;
+}
+
+.confidence-low .confidence-icon {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+}
+
+.confidence-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.confidence-high .confidence-label {
+  color: #4ecdc4;
+}
+
+.confidence-medium .confidence-label {
+  color: #ffb347;
+}
+
+.confidence-low .confidence-label {
+  color: #ff6b6b;
+}
+
+.confidence-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.confidence-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 1s ease-out;
+}
+
+.confidence-score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.score-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: "DM Mono", monospace;
+}
+
+.confidence-high .score-value {
+  color: #4ecdc4;
+}
+
+.confidence-medium .score-value {
+  color: #ffb347;
+}
+
+.confidence-low .score-value {
+  color: #ff6b6b;
+}
+
+.score-description {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .confidence-score {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
