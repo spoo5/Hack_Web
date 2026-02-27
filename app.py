@@ -24,21 +24,22 @@ st.set_page_config(page_title="CSV Query UI", page_icon="🦆", layout="wide")
 st.title("🦆 CSV Query UI")
 st.caption("Upload a CSV, explore its schema, run DuckDB SQL queries, and get AI-powered insights.")
 
-# ── Sidebar — OpenAI settings ──────────────────────────────────────────────────
+# ── Sidebar — Gemini settings ──────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
-    openai_api_key = st.text_input(
-        "OpenAI API Key",
+
+    gemini_api_key = st.text_input(
+        "Gemini API Key",
         type="password",
-        placeholder="sk-…",
-        help="Required for AI cleaning suggestions, NL queries and weekly reports.",
+        placeholder="AIza…",
+        help="Get your key from https://aistudio.google.com/app/apikey",
     )
     llm_model = st.selectbox(
         "Model",
-        ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+        ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
         index=0,
-        help="LLM model used for all AI features.",
     )
+
     st.divider()
     st.caption("Table name: **data**  |  Only SELECT/WITH queries are allowed in the SQL editor.")
 
@@ -51,6 +52,13 @@ if "profile_json" not in st.session_state:
     st.session_state.profile_json = None
 if "cleaning_steps" not in st.session_state:
     st.session_state.cleaning_steps = []
+
+# Cache the Gemini client; recreate only when the key changes
+_cached_key = st.session_state.get("_gemini_api_key_cached", "")
+if gemini_api_key and gemini_api_key != _cached_key:
+    st.session_state._gemini_client = get_client(gemini_api_key)
+    st.session_state._gemini_api_key_cached = gemini_api_key
+_llm_client = st.session_state.get("_gemini_client") if gemini_api_key else None
 
 PREVIEW_ROWS = 100  # configurable default for the preview section
 
@@ -227,13 +235,13 @@ if st.session_state.table_loaded:
     # ── AI Cleaning Suggestions (LLM Handshake) ────────────────────────────────
     st.divider()
     st.subheader("🤖 AI Cleaning Suggestions")
-    if not openai_api_key:
-        st.info("Enter your OpenAI API key in the sidebar to enable AI features.")
+    if not gemini_api_key:
+        st.info("Enter your API key in the sidebar to enable AI features.")
     else:
         if st.button("🔍 Analyse & Suggest Cleaning Steps"):
             with st.spinner("Sending schema to LLM…"):
                 try:
-                    _client = get_client(openai_api_key)
+                    _client = _llm_client
                     st.session_state.cleaning_steps = llm_handshake(
                         st.session_state.profile_json, _client, model=llm_model
                     )
@@ -272,8 +280,8 @@ if st.session_state.table_loaded:
     # ── Natural Language Query ─────────────────────────────────────────────────
     st.divider()
     st.subheader("💬 Ask a Question About Your Data")
-    if not openai_api_key:
-        st.info("Enter your OpenAI API key in the sidebar to enable this feature.")
+    if not gemini_api_key:
+        st.info("Enter your API key in the sidebar to enable this feature.")
     else:
         nl_question = st.text_input(
             "Question",
@@ -286,7 +294,7 @@ if st.session_state.table_loaded:
             else:
                 with st.spinner("Translating question to SQL…"):
                     try:
-                        _client = get_client(openai_api_key)
+                        _client = _llm_client
                         generated_sql = nl_to_sql(
                             nl_question,
                             st.session_state.profile_json,
@@ -309,7 +317,7 @@ if st.session_state.table_loaded:
                     else:
                         with st.spinner("Formatting answer…"):
                             try:
-                                _client = get_client(openai_api_key)
+                                _client = _llm_client
                                 answer = format_answer(
                                     nl_question,
                                     generated_sql,
@@ -356,13 +364,13 @@ if st.session_state.table_loaded:
     # ── Weekly Report ──────────────────────────────────────────────────────────
     st.divider()
     st.subheader("📅 Generate Weekly Report")
-    if not openai_api_key:
-        st.info("Enter your OpenAI API key in the sidebar to enable this feature.")
+    if not gemini_api_key:
+        st.info("Enter your API key in the sidebar to enable this feature.")
     else:
         if st.button("📋 Generate Weekly Report Template"):
             with st.spinner("Generating report template…"):
                 try:
-                    _client = get_client(openai_api_key)
+                    _client = _llm_client
                     report = generate_weekly_report(
                         st.session_state.profile_json, _client, model=llm_model
                     )

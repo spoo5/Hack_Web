@@ -1,4 +1,4 @@
-"""LLM integration: cleaning handshake, NL-to-SQL, and answer formatting."""
+"""LLM integration via Google Gemini: cleaning handshake, NL-to-SQL, and answer formatting."""
 
 import json
 from typing import Any
@@ -63,15 +63,40 @@ _WEEKLY_REPORT_PROMPT = (
 )
 
 
+# ── Gemini client ─────────────────────────────────────────────────────────────
+
+class _GeminiClient:
+    """Thin wrapper around google-generativeai."""
+
+    def __init__(self, api_key: str) -> None:
+        import google.generativeai as genai  # local import – optional dependency
+        genai.configure(api_key=api_key)
+        self._genai = genai
+
+    def generate(self, model: str, prompt: str, json_mode: bool = False) -> str:
+        generation_config = self._genai.types.GenerationConfig(
+            response_mime_type="application/json" if json_mode else "text/plain",
+        )
+        m = self._genai.GenerativeModel(
+            model_name=model,
+            generation_config=generation_config,
+        )
+        return m.generate_content(prompt).text
+
+
+def _call_llm(prompt: str, client: "_GeminiClient", model: str, json_mode: bool = False) -> str:
+    """Call the Gemini LLM and return the raw text response."""
+    return client.generate(model=model, prompt=prompt, json_mode=json_mode)
+
+
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def get_client(api_key: str):
-    """Create and return an OpenAI client."""
-    from openai import OpenAI  # local import so the module loads without the package
-    return OpenAI(api_key=api_key)
+def get_client(api_key: str) -> _GeminiClient:
+    """Create and return a Gemini client."""
+    return _GeminiClient(api_key)
 
 
-def llm_handshake(profile: dict, client, model: str = "gpt-4o-mini") -> list[dict]:
+def llm_handshake(profile: dict, client: _GeminiClient, model: str = "gemini-2.0-flash") -> list[dict]:
     """
     Send the profile JSON to the LLM and ask for cleaning steps.
     Returns a list of dicts, each with 'description' and 'sql' keys.
@@ -79,26 +104,17 @@ def llm_handshake(profile: dict, client, model: str = "gpt-4o-mini") -> list[dic
     prompt = _HANDSHAKE_PROMPT.format(
         profile_json=json.dumps(profile, indent=2, default=str)
     )
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-    )
-    raw = response.choices[0].message.content
+    raw = _call_llm(prompt, client, model, json_mode=True)
     return json.loads(raw).get("steps", [])
 
 
-def nl_to_sql(question: str, profile: dict, client, model: str = "gpt-4o-mini") -> str:
+def nl_to_sql(question: str, profile: dict, client: _GeminiClient, model: str = "gemini-2.0-flash") -> str:
     """Convert a natural language question to a DuckDB SELECT query."""
     prompt = _NL_TO_SQL_PROMPT.format(
         profile_json=json.dumps(profile, indent=2, default=str),
         question=question,
     )
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    sql = response.choices[0].message.content.strip()
+    sql = _call_llm(prompt, client, model, json_mode=False).strip()
     # Strip markdown code fences if the model wrapped the SQL
     if sql.startswith("```"):
         lines = sql.splitlines()
@@ -110,8 +126,8 @@ def format_answer(
     question: str,
     sql: str,
     result_df: pd.DataFrame,
-    client,
-    model: str = "gpt-4o-mini",
+    client: _GeminiClient,
+    model: str = "gemini-2.0-flash",
 ) -> dict[str, Any]:
     """
     Format the SQL result into a structured response.
@@ -123,16 +139,11 @@ def format_answer(
         sql=sql,
         result_json=result_json,
     )
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-    )
-    raw = response.choices[0].message.content
+    raw = _call_llm(prompt, client, model, json_mode=True)
     return json.loads(raw)
 
 
-def generate_weekly_report(profile: dict, client, model: str = "gpt-4o-mini") -> dict[str, Any]:
+def generate_weekly_report(profile: dict, client: _GeminiClient, model: str = "gemini-2.0-flash") -> dict[str, Any]:
     """
     Ask the LLM to produce a structured weekly report template for the dataset.
     Returns a dict with 'summary', 'metrics', and 'quality_notes' keys.
@@ -140,10 +151,6 @@ def generate_weekly_report(profile: dict, client, model: str = "gpt-4o-mini") ->
     prompt = _WEEKLY_REPORT_PROMPT.format(
         profile_json=json.dumps(profile, indent=2, default=str)
     )
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-    )
-    raw = response.choices[0].message.content
+    raw = _call_llm(prompt, client, model, json_mode=True)
     return json.loads(raw)
+
