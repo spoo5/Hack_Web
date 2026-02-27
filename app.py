@@ -9,24 +9,48 @@ import streamlit as st
 from engine import (
     load_csv,
     run_query,
+    run_cleaning_sql,
     build_filter_sql,
     build_agg_sql,
     FILTER_OPS,
     AGG_FUNCS,
     QueryResult,
 )
-from profiling import profile_table, profile_to_dataframe, validate_table
+from profiling import profile_table, profile_to_dataframe, validate_table, generate_profile_json
+from llm import get_client, llm_handshake, nl_to_sql, format_answer, generate_weekly_report
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="CSV Query UI", page_icon="🦆", layout="wide")
 st.title("🦆 CSV Query UI")
-st.caption("Upload a CSV, explore its schema, and run DuckDB SQL queries.")
+st.caption("Upload a CSV, explore its schema, run DuckDB SQL queries, and get AI-powered insights.")
+
+# ── Sidebar — OpenAI settings ──────────────────────────────────────────────────
+with st.sidebar:
+    st.header("⚙️ Settings")
+    openai_api_key = st.text_input(
+        "OpenAI API Key",
+        type="password",
+        placeholder="sk-…",
+        help="Required for AI cleaning suggestions, NL queries and weekly reports.",
+    )
+    llm_model = st.selectbox(
+        "Model",
+        ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+        index=0,
+        help="LLM model used for all AI features.",
+    )
+    st.divider()
+    st.caption("Table name: **data**  |  Only SELECT/WITH queries are allowed in the SQL editor.")
 
 # ── Session state ──────────────────────────────────────────────────────────────
 if "con" not in st.session_state:
     st.session_state.con = duckdb.connect()
 if "table_loaded" not in st.session_state:
     st.session_state.table_loaded = False
+if "profile_json" not in st.session_state:
+    st.session_state.profile_json = None
+if "cleaning_steps" not in st.session_state:
+    st.session_state.cleaning_steps = []
 
 PREVIEW_ROWS = 100  # configurable default for the preview section
 
@@ -75,6 +99,8 @@ if uploaded is not None:
     os.unlink(tmp_path)
 
     st.session_state.table_loaded = True
+    st.session_state.profile_json = None   # reset profile when a new file is loaded
+    st.session_state.cleaning_steps = []
     if warnings:
         for w in warnings:
             st.warning(w)
@@ -85,6 +111,10 @@ if st.session_state.table_loaded:
     profile = profile_table(st.session_state.con)
     col_names_list = [c.name for c in profile.columns]
     col_type_map = {c.name: c.dtype for c in profile.columns}
+
+    # Generate (or reuse) profile JSON for LLM features
+    if st.session_state.profile_json is None:
+        st.session_state.profile_json = generate_profile_json(st.session_state.con)
 
     st.subheader("📊 Dataset Overview")
     c1, c2 = st.columns(2)
@@ -193,4 +223,170 @@ if st.session_state.table_loaded:
             result = run_query(sql, st.session_state.con)
         st.subheader("Query Results")
         _show_result(result)
+
+    # ── AI Cleaning Suggestions (LLM Handshake) ────────────────────────────────
+    st.divider()
+    st.subheader("🤖 AI Cleaning Suggestions")
+    if not openai_api_key:
+        st.info("Enter your OpenAI API key in the sidebar to enable AI features.")
+    else:
+        if st.button("🔍 Analyse & Suggest Cleaning Steps"):
+            with st.spinner("Sending schema to LLM…"):
+                try:
+                    _client = get_client(openai_api_key)
+                    st.session_state.cleaning_steps = llm_handshake(
+                        st.session_state.profile_json, _client, model=llm_model
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"LLM error: {exc}")
+
+        if st.session_state.cleaning_steps:
+            st.success(
+                f"Found **{len(st.session_state.cleaning_steps)}** suggested cleaning step(s)."
+            )
+            for i, step in enumerate(st.session_state.cleaning_steps, 1):
+                with st.expander(f"Step {i}: {step.get('description', '(no description)')}", expanded=True):
+                    suggested_sql = step.get("sql", "")
+                    edited_sql = st.text_area(
+                        "SQL (editable)",
+                        value=suggested_sql,
+                        height=80,
+                        key=f"clean_sql_{i}",
+                    )
+                    if st.button(f"▶ Apply Step {i}", key=f"apply_clean_{i}"):
+                        err = run_cleaning_sql(edited_sql, st.session_state.con)
+                        if err:
+                            st.error(f"Error: {err}")
+                        else:
+                            # Verify schema is intact after cleaning
+                            verify = st.session_state.con.execute(
+                                "SELECT * FROM data LIMIT 0"
+                            ).df()
+                            # Refresh profile JSON after cleaning
+                            st.session_state.profile_json = generate_profile_json(
+                                st.session_state.con
+                            )
+                            st.success("✅ Cleaning step applied. Schema verified.")
+                            st.caption(f"Columns after cleaning: {', '.join(verify.columns)}")
+
+    # ── Natural Language Query ─────────────────────────────────────────────────
+    st.divider()
+    st.subheader("💬 Ask a Question About Your Data")
+    if not openai_api_key:
+        st.info("Enter your OpenAI API key in the sidebar to enable this feature.")
+    else:
+        nl_question = st.text_input(
+            "Question",
+            placeholder="e.g. What is the churn rate?  |  What was total revenue in March?",
+            key="nl_question",
+        )
+        if st.button("▶ Get Answer", key="nl_run"):
+            if not nl_question.strip():
+                st.warning("Please enter a question.")
+            else:
+                with st.spinner("Translating question to SQL…"):
+                    try:
+                        _client = get_client(openai_api_key)
+                        generated_sql = nl_to_sql(
+                            nl_question,
+                            st.session_state.profile_json,
+                            _client,
+                            model=llm_model,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"LLM error: {exc}")
+                        generated_sql = ""
+
+                if generated_sql:
+                    with st.expander("Generated SQL", expanded=True):
+                        st.code(generated_sql, language="sql")
+
+                    with st.spinner("Executing query…"):
+                        nl_result = run_query(generated_sql, st.session_state.con)
+
+                    if nl_result.error:
+                        st.error(nl_result.error)
+                    else:
+                        with st.spinner("Formatting answer…"):
+                            try:
+                                _client = get_client(openai_api_key)
+                                answer = format_answer(
+                                    nl_question,
+                                    generated_sql,
+                                    nl_result.df,
+                                    _client,
+                                    model=llm_model,
+                                )
+                            except Exception as exc:  # noqa: BLE001
+                                st.error(f"LLM error: {exc}")
+                                answer = {}
+
+                        if answer:
+                            st.markdown(f"### 📝 Answer\n{answer.get('answer', '')}")
+                            st.caption(f"**Reasoning:** {answer.get('reasoning', '')}")
+                            confidence = answer.get("confidence")
+                            if confidence is not None:
+                                st.metric("Confidence", f"{confidence}%")
+
+                            # Raw result table
+                            with st.expander("Raw query result", expanded=False):
+                                st.dataframe(nl_result.df, use_container_width=True)
+
+                            # Render chart if suggested
+                            chart_info = answer.get("chart", {})
+                            chart_type = chart_info.get("type", "none")
+                            x_col = chart_info.get("x", "")
+                            y_col = chart_info.get("y", "")
+                            if (
+                                chart_type != "none"
+                                and x_col in nl_result.df.columns
+                                and y_col in nl_result.df.columns
+                            ):
+                                chart_df = nl_result.df.set_index(x_col)[[y_col]]
+                                st.subheader(f"📊 Chart ({chart_type})")
+                                if chart_type == "line":
+                                    st.line_chart(chart_df)
+                                elif chart_type == "bar":
+                                    st.bar_chart(chart_df)
+                                elif chart_type == "area":
+                                    st.area_chart(chart_df)
+                                else:
+                                    st.bar_chart(chart_df)
+
+    # ── Weekly Report ──────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📅 Generate Weekly Report")
+    if not openai_api_key:
+        st.info("Enter your OpenAI API key in the sidebar to enable this feature.")
+    else:
+        if st.button("📋 Generate Weekly Report Template"):
+            with st.spinner("Generating report template…"):
+                try:
+                    _client = get_client(openai_api_key)
+                    report = generate_weekly_report(
+                        st.session_state.profile_json, _client, model=llm_model
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"LLM error: {exc}")
+                    report = {}
+
+            if report:
+                st.markdown(f"**Dataset Summary:** {report.get('summary', '')}")
+                metrics = report.get("metrics", [])
+                if metrics:
+                    st.markdown("#### Key Metrics")
+                    for m in metrics:
+                        with st.expander(f"📌 {m.get('name', 'Metric')}", expanded=False):
+                            st.caption(m.get("description", ""))
+                            st.code(m.get("sql", ""), language="sql")
+                            if st.button(f"▶ Run: {m.get('name', '')}", key=f"rpt_{m.get('name','')}"):
+                                with st.spinner("Running…"):
+                                    rpt_result = run_query(m.get("sql", ""), st.session_state.con)
+                                _show_result(rpt_result)
+
+                notes = report.get("quality_notes", [])
+                if notes:
+                    st.markdown("#### ⚠️ Data Quality Notes")
+                    for note in notes:
+                        st.warning(note)
 

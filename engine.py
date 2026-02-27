@@ -20,6 +20,9 @@ class QueryResult:
 
 
 _ALLOWED_START = re.compile(r"^\s*(SELECT|WITH)\b", re.IGNORECASE)
+_ALLOWED_CLEANING_START = re.compile(
+    r"^\s*(UPDATE|ALTER\s+TABLE|CREATE\s+OR\s+REPLACE\s+TABLE)\b", re.IGNORECASE
+)
 # Match a semicolon that is not inside a single-quoted string.
 # We strip single-quoted strings (handling escaped '' inside them) before checking.
 _STRIP_STRINGS = re.compile(r"'(?:[^'\\]|\\.)*'", re.DOTALL)
@@ -60,6 +63,28 @@ def load_csv(path: str, con: duckdb.DuckDBPyConnection) -> list[str]:
         """
     )
     return warnings
+
+
+def run_cleaning_sql(sql: str, con: duckdb.DuckDBPyConnection) -> str | None:
+    """
+    Execute a cleaning SQL statement (UPDATE / ALTER TABLE / CREATE OR REPLACE TABLE).
+    Returns an error string on failure, or None on success.
+    Only statements that reference the 'data' table are accepted.
+    """
+    stripped = sql.strip()
+    if not _ALLOWED_CLEANING_START.match(stripped):
+        return (
+            "Cleaning SQL must start with UPDATE, ALTER TABLE, "
+            "or CREATE OR REPLACE TABLE."
+        )
+    # Require that the statement references 'data' (simple guard)
+    if "data" not in stripped.lower():
+        return "Cleaning SQL must reference the 'data' table."
+    try:
+        con.execute(stripped)
+        return None
+    except Exception as exc:  # noqa: BLE001
+        return str(exc)
 
 
 def run_query(sql: str, con: duckdb.DuckDBPyConnection) -> QueryResult:

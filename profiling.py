@@ -87,6 +87,25 @@ class ValidationReport:
     high_null_columns: list[str]  # null_count > 50 % of rows (excluding all-null)
 
 
+def generate_profile_json(
+    con: duckdb.DuckDBPyConnection,
+    table: str = "data",
+    sample_rows: int = 3,
+) -> dict:
+    """Return a profile dict with column names, dtypes, and a sample of *sample_rows* rows."""
+    _validate_identifier(table)
+    schema_rows = con.execute(
+        "SELECT column_name, data_type FROM information_schema.columns "
+        "WHERE table_name=? ORDER BY ordinal_position",
+        [table],
+    ).fetchall()
+    sample_df = con.execute(f"SELECT * FROM {table} LIMIT {int(sample_rows)}").df()
+    return {
+        "columns": [{"name": col, "dtype": dtype} for col, dtype in schema_rows],
+        "sample": sample_df.to_dict(orient="records"),
+    }
+
+
 def validate_table(
     con: duckdb.DuckDBPyConnection,
     profile: TableProfile,
