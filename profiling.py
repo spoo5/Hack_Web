@@ -7,6 +7,7 @@ import duckdb
 import pandas as pd
 
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+HIGH_NULL_THRESHOLD = 0.5  # columns with null_count > this fraction are flagged
 
 
 @dataclass
@@ -76,4 +77,44 @@ def profile_to_dataframe(profile: TableProfile) -> pd.DataFrame:
             }
             for c in profile.columns
         ]
+    )
+
+
+@dataclass
+class ValidationReport:
+    duplicate_row_count: int
+    all_null_columns: list[str]   # null_count == row_count
+    high_null_columns: list[str]  # null_count > 50 % of rows (excluding all-null)
+
+
+def validate_table(
+    con: duckdb.DuckDBPyConnection,
+    profile: TableProfile,
+    table: str = "data",
+) -> ValidationReport:
+    """Return a ValidationReport for *table*."""
+    _validate_identifier(table)
+
+    # Duplicate rows: total rows minus distinct rows
+    distinct_count: int = con.execute(
+        f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {table})"
+    ).fetchone()[0]  # type: ignore[index]
+    dup_count = profile.row_count - distinct_count
+
+    threshold = profile.row_count * HIGH_NULL_THRESHOLD if profile.row_count > 0 else 0
+    all_null = [
+        c.name
+        for c in profile.columns
+        if profile.row_count > 0 and c.null_count == profile.row_count
+    ]
+    high_null = [
+        c.name
+        for c in profile.columns
+        if c.null_count > threshold and c.name not in all_null
+    ]
+
+    return ValidationReport(
+        duplicate_row_count=dup_count,
+        all_null_columns=all_null,
+        high_null_columns=high_null,
     )
