@@ -226,15 +226,26 @@ async def get_dataset_info():
     }
 
 
+@app.get("/schema")
+async def get_schema():
+    """Get current dataset schema"""
+    if not csv_manager.has_dataset():
+        raise HTTPException(status_code=404, detail="No dataset loaded")
+
+    df = csv_manager.get_dataframe()
+    schema = schema_analyzer.analyze(df)
+    return schema
+
+
 @app.post("/query")
 async def query_dataset(request: QueryRequest):
     """
     Process natural language query and return structured response
     """
+    if not csv_manager.has_dataset():
+        raise HTTPException(status_code=404, detail="No dataset loaded. Please upload a CSV first.")
+
     try:
-        if not csv_manager.has_dataset():
-            raise HTTPException(status_code=404, detail="No dataset loaded. Please upload a CSV first.")
-        
         df = csv_manager.get_dataframe()
         schema = schema_analyzer.analyze(df)
         
@@ -263,8 +274,9 @@ async def query_dataset(request: QueryRequest):
                 "grounding_info": "Query parsing failed"
             }
         
-        # Execute query using Pandas
-        result = analytics_engine.execute(df, parsed_query)
+        # Execute query using DuckDB (if llm_sql present) or Pandas
+        con = csv_manager.get_connection()
+        result = analytics_engine.execute(df, parsed_query, con=con)
         
         # Format response
         response = response_formatter.format(
@@ -276,7 +288,7 @@ async def query_dataset(request: QueryRequest):
         # Add to conversation history
         conversation_history.append({
             "query": request.query,
-            "parsed": parsed_query,
+            "parsed": {k: v for k, v in parsed_query.items() if k != "llm_sql"},
             "response": response
         })
         
@@ -287,7 +299,17 @@ async def query_dataset(request: QueryRequest):
         return response
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+        # Return a safe fallback response — never crash the API
+        return {
+            "answer": "Unable to interpret query precisely. Please rephrase.",
+            "sql_logic": "",
+            "derivation": {"error": str(e)},
+            "visualization_type": "none",
+            "chart_data": {},
+            "row_count": 0,
+            "confidence_score": 40.0,
+            "grounding_info": "Fallback response due to query interpretation failure."
+        }
 
 
 @app.get("/conversation/history")

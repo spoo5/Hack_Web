@@ -5,9 +5,24 @@ Formats analytics results into structured 4-section output:
 2. SQL/Query Logic
 3. Derivation Explanation
 4. Visualization Data
+
+When the analytics engine returns a DuckDB result (type == 'duckdb_result'),
+the LLM's format_answer() is tried first for richer natural-language output.
 """
 
+import os
 from typing import Dict, Any, List
+
+# LLM-enhanced formatting (optional – falls back gracefully)
+try:
+    from llm import get_client, format_answer as _format_answer
+
+    _api_key = os.environ.get("MISTRAL_API_KEY", "")
+    _llm_client = get_client(_api_key) if _api_key else None
+    _llm_model = os.environ.get("MISTRAL_MODEL", "mistral-large-latest")
+except Exception:
+    _llm_client = None
+    _llm_model = "mistral-large-latest"
 
 
 class ResponseFormatter:
@@ -28,6 +43,10 @@ class ResponseFormatter:
         - grounding_info: Data grounding statement
         """
         result_type = result.get("type", "unknown")
+
+        # DuckDB result path – try LLM formatting, fall back to generic
+        if result_type == "duckdb_result":
+            return self._format_duckdb_result(result, parsed_query, total_rows)
         
         # Route to appropriate formatter - ALL GENERIC
         if result_type == "binary_rate_analysis":
@@ -71,7 +90,102 @@ class ResponseFormatter:
         
         else:
             return self._format_generic(result, parsed_query, total_rows)
-    
+
+    # ------------------------------------------------------------------
+    # DuckDB result formatter
+    # ------------------------------------------------------------------
+    def _format_duckdb_result(
+        self, result: Dict, parsed_query: Dict, total_rows: int
+    ) -> Dict[str, Any]:
+        """Format a DuckDB query result, using LLM if available."""
+        sql = result.get("sql", "")
+        result_df = result.get("df")
+        question = parsed_query.get("original_query", "")
+        rows = result.get("rows", [])
+        columns = result.get("columns", [])
+
+        # Try LLM-enhanced formatting
+        if _llm_client is not None and result_df is not None:
+            try:
+                llm_fmt = _format_answer(question, sql, result_df, _llm_client, model=_llm_model)
+                chart = llm_fmt.get("chart", {})
+                chart_type = chart.get("type", "none")
+                x_col = chart.get("x", "")
+                y_col = chart.get("y", "")
+
+                # Build chart_data from result rows if columns are present
+                chart_data: Dict[str, Any] = {}
+                if chart_type != "none" and x_col and y_col and rows:
+                    chart_data = {
+                        "labels": [str(r.get(x_col, "")) for r in rows],
+                        "datasets": [{
+                            "label": y_col,
+                            "data": [r.get(y_col) for r in rows],
+                            "backgroundColor": self._generate_colors(len(rows)),
+                        }]
+                    }
+
+                return {
+                    "answer": llm_fmt.get("answer", "Analysis complete."),
+                    "sql_logic": sql,
+                    "derivation": {
+                        "rows_analyzed": total_rows,
+                        "columns_used": columns,
+                        "reasoning": llm_fmt.get("reasoning", ""),
+                        "calculation_steps": [llm_fmt.get("reasoning", "")] if llm_fmt.get("reasoning") else [],
+                    },
+                    "visualization_type": chart_type,
+                    "chart_data": chart_data,
+                    "row_count": total_rows,
+                    "confidence_score": float(llm_fmt.get("confidence", 85)),
+                    "grounding_info": (
+                        f"Computed by DuckDB from {total_rows} rows. "
+                        "All numbers are deterministic."
+                    ),
+                }
+            except Exception:
+                pass  # Fall through to generic formatting
+
+        # Generic formatting for DuckDB results (no LLM)
+        answer_lines = [f"Query returned {len(rows)} row(s)."]
+        if rows:
+            for row in rows[:5]:
+                answer_lines.append("  " + ", ".join(f"{k}: {v}" for k, v in row.items()))
+
+        # Attempt simple chart if 2 columns
+        chart_data = {}
+        vis_type = "none"
+        if len(columns) == 2 and rows:
+            x_col, y_col = columns[0], columns[1]
+            vis_type = "bar"
+            chart_data = {
+                "labels": [str(r.get(x_col, "")) for r in rows],
+                "datasets": [{
+                    "label": y_col,
+                    "data": [r.get(y_col) for r in rows],
+                    "backgroundColor": self._generate_colors(len(rows)),
+                }]
+            }
+
+        return {
+            "answer": "\n".join(answer_lines),
+            "sql_logic": sql,
+            "derivation": {
+                "rows_analyzed": total_rows,
+                "columns_used": columns,
+                "result_rows": len(rows),
+            },
+            "visualization_type": vis_type,
+            "chart_data": chart_data,
+            "row_count": total_rows,
+            "confidence_score": 85.0,
+            "grounding_info": (
+                f"Computed by DuckDB from {total_rows} rows. "
+                "All numbers are deterministic."
+            ),
+        }
+
+
     def _format_binary_rate(self, result: Dict, parsed: Dict, total_rows: int) -> Dict[str, Any]:
         """
         Format binary rate analysis with grouping - FULLY GENERIC

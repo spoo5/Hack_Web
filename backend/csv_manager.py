@@ -3,9 +3,13 @@ CSV Manager Module
 Handles CSV file upload, validation, and storage
 """
 
-import pandas as pd
 import io
+import os
+import tempfile
 from typing import Dict, Any, Optional
+
+import duckdb
+import pandas as pd
 
 
 class CSVManager:
@@ -15,10 +19,12 @@ class CSVManager:
         self.dataframe: Optional[pd.DataFrame] = None
         self.filename: Optional[str] = None
         self.metadata: Dict[str, Any] = {}
+        self._con: Optional[duckdb.DuckDBPyConnection] = None
+        self._tmpfile: Optional[str] = None
     
     def load_csv(self, content: bytes, filename: str) -> Dict[str, Any]:
         """
-        Load CSV from bytes content
+        Load CSV from bytes content into both pandas and DuckDB.
         
         Args:
             content: Raw CSV file content as bytes
@@ -28,10 +34,34 @@ class CSVManager:
             Dictionary with dataset information
         """
         try:
-            # Parse CSV
+            # Parse CSV into pandas DataFrame
             self.dataframe = pd.read_csv(io.BytesIO(content))
             self.filename = filename
             
+            # Write content to a temp file so DuckDB can read it
+            if self._tmpfile and os.path.exists(self._tmpfile):
+                os.unlink(self._tmpfile)
+            tmp = tempfile.NamedTemporaryFile(
+                delete=False, suffix=".csv", mode="wb"
+            )
+            tmp.write(content)
+            tmp.close()
+            self._tmpfile = tmp.name
+
+            # (Re)create in-memory DuckDB connection and load the table
+            if self._con is not None:
+                try:
+                    self._con.close()
+                except Exception:
+                    pass
+            self._con = duckdb.connect()
+            self._con.execute("DROP TABLE IF EXISTS data")
+            escaped = self._tmpfile.replace("'", "''")
+            self._con.execute(
+                f"CREATE TABLE data AS SELECT * FROM read_csv('{escaped}', "
+                "auto_detect=true, null_padding=true)"
+            )
+
             # Store metadata
             self.metadata = {
                 "filename": filename,
@@ -63,6 +93,10 @@ class CSVManager:
         if not self.has_dataset():
             raise Exception("No dataset loaded")
         return self.dataframe
+
+    def get_connection(self) -> Optional[duckdb.DuckDBPyConnection]:
+        """Get the DuckDB connection (None if no dataset loaded)"""
+        return self._con
     
     def get_metadata(self) -> Dict[str, Any]:
         """Get dataset metadata"""
@@ -85,3 +119,12 @@ class CSVManager:
         self.dataframe = None
         self.filename = None
         self.metadata = {}
+        if self._con is not None:
+            try:
+                self._con.close()
+            except Exception:
+                pass
+            self._con = None
+        if self._tmpfile and os.path.exists(self._tmpfile):
+            os.unlink(self._tmpfile)
+        self._tmpfile = None

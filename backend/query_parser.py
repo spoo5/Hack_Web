@@ -2,11 +2,24 @@
 Query Parser Module
 Parses natural language queries and maps to database operations
 FULLY DATASET-AGNOSTIC - No hardcoded column names or business logic
+Integrates Mistral AI LLM for NL-to-SQL with rule-based fallback.
 """
 
+import os
 import re
 from typing import Dict, List, Any, Optional
 from difflib import get_close_matches
+
+# LLM integration (optional – falls back gracefully if unavailable)
+try:
+    from llm import get_client, nl_to_sql as _nl_to_sql
+
+    _api_key = os.environ.get("MISTRAL_API_KEY", "")
+    _llm_client = get_client(_api_key) if _api_key else None
+    _llm_model = os.environ.get("MISTRAL_MODEL", "mistral-large-latest")
+except Exception:
+    _llm_client = None
+    _llm_model = "mistral-large-latest"
 
 
 class QueryParser:
@@ -25,11 +38,35 @@ class QueryParser:
         self.distribution_keywords = ['distribution', 'spread', 'breakdown']
         self.max_keywords = ['highest', 'maximum', 'max', 'largest', 'top', 'most']
         self.min_keywords = ['lowest', 'minimum', 'min', 'smallest', 'bottom', 'least']
-    
-    
+
+    # ------------------------------------------------------------------
+    # LLM-assisted SQL generation (returns a SQL string, or None)
+    # ------------------------------------------------------------------
+    def _try_llm_sql(self, query: str, schema: Dict[str, Any]) -> Optional[str]:
+        """
+        Attempt to get a SQL string from the Mistral LLM.
+        Returns None on any failure so callers can fall back to rule-based parsing.
+        """
+        try:
+            if _llm_client is None:
+                return None
+            # Build the profile dict expected by nl_to_sql
+            profile = {
+                "columns": [
+                    {"name": col["name"], "dtype": col.get("dtype", col.get("type", "text"))}
+                    for col in schema.get("columns", [])
+                ],
+                "sample": [],
+            }
+            sql = _nl_to_sql(query, profile, _llm_client, model=_llm_model)
+            return sql if sql and sql.strip() else None
+        except Exception:
+            return None
+
+
     def parse(self, query: str, schema: Dict[str, Any], context: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Parse natural language query - FULLY DYNAMIC
+        Parse natural language query - tries LLM first, falls back to rule-based.
         
         Args:
             query: User's natural language question
@@ -37,8 +74,11 @@ class QueryParser:
             context: Previous conversation context
             
         Returns:
-            Structured query dictionary
+            Structured query dictionary (may include 'llm_sql' key when LLM is used)
         """
+        # Try LLM-assisted SQL generation first
+        llm_sql = self._try_llm_sql(query, schema)
+
         query_lower = query.lower()
         
         parsed = {
@@ -50,7 +90,11 @@ class QueryParser:
             "aggregation": None,
             "sort_order": None
         }
-        
+
+        # Attach LLM-generated SQL if available (used by analytics_engine)
+        if llm_sql:
+            parsed["llm_sql"] = llm_sql
+
         # Extract column references from schema
         columns = schema.get("columns", [])
         column_names = [col["name"] for col in columns]

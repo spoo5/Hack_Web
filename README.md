@@ -162,11 +162,17 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
+# (Optional) Set Mistral AI API key for LLM-enhanced NL-to-SQL
+export MISTRAL_API_KEY=your_api_key_here  # Linux/Mac
+# set MISTRAL_API_KEY=your_api_key_here   # Windows
+
 # Run backend server
 python main.py
 ```
 
 Backend runs on: **http://localhost:8000**
+
+> **Note:** Without a `MISTRAL_API_KEY`, the backend still works fully using its built-in rule-based query parser and DuckDB engine. The Mistral AI integration is optional and provides richer NL-to-SQL and answer formatting when available.
 
 ### 2️⃣ Frontend Setup
 
