@@ -54,11 +54,11 @@ if "cleaning_steps" not in st.session_state:
     st.session_state.cleaning_steps = []
 
 # Cache the Gemini client; recreate only when the key changes
-_cached_key = st.session_state.get("_gemini_api_key_cached", "")
+_cached_key = st.session_state.get("gemini_api_key_cached", "")
 if gemini_api_key and gemini_api_key != _cached_key:
-    st.session_state._gemini_client = get_client(gemini_api_key)
-    st.session_state._gemini_api_key_cached = gemini_api_key
-_llm_client = st.session_state.get("_gemini_client") if gemini_api_key else None
+    st.session_state.gemini_client = get_client(gemini_api_key)
+    st.session_state.gemini_api_key_cached = gemini_api_key
+_llm_client = st.session_state.get("gemini_client") if gemini_api_key else None
 
 PREVIEW_ROWS = 100  # configurable default for the preview section
 
@@ -82,7 +82,7 @@ def _show_result(result: QueryResult, download_name: str = "query_results.csv") 
     if result.columns:
         st.caption(f"Result columns: {', '.join(result.columns)}")
 
-    st.dataframe(result.df, use_container_width=True)
+    st.dataframe(result.df, width="stretch")
 
     csv_bytes = result.df.to_csv(index=False).encode("utf-8")
     st.download_button(
@@ -130,13 +130,13 @@ if st.session_state.table_loaded:
     c2.metric("Columns", len(profile.columns))
 
     with st.expander("Schema & Null Counts", expanded=True):
-        st.dataframe(profile_to_dataframe(profile), use_container_width=True)
+        st.dataframe(profile_to_dataframe(profile), width="stretch")
 
     with st.expander(f"Data Preview (first {PREVIEW_ROWS} rows)", expanded=False):
         preview_df = st.session_state.con.execute(
             f"SELECT * FROM data LIMIT {int(PREVIEW_ROWS)}"
         ).df()
-        st.dataframe(preview_df, use_container_width=True)
+        st.dataframe(preview_df, width="stretch")
 
     # ── Data Validation ────────────────────────────────────────────────────────
     with st.expander("🔎 Data Validation", expanded=False):
@@ -338,7 +338,7 @@ if st.session_state.table_loaded:
 
                             # Raw result table
                             with st.expander("Raw query result", expanded=False):
-                                st.dataframe(nl_result.df, use_container_width=True)
+                                st.dataframe(nl_result.df, width="stretch")
 
                             # Render chart if suggested
                             chart_info = answer.get("chart", {})
