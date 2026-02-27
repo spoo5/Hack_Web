@@ -1,8 +1,8 @@
-fastapi==0.109.0
+fastapi==0.109.1
 uvicorn[standard]==0.27.0
 pandas==2.2.0
 numpy==1.26.3
 pydantic==2.5.3
-python-multipart==0.0.6
+python-multipart==0.0.22
 duckdb>=0.10.0
 mistralai>=1.0.0
