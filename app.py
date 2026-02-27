@@ -24,19 +24,19 @@ st.set_page_config(page_title="CSV Query UI", page_icon="🦆", layout="wide")
 st.title("🦆 CSV Query UI")
 st.caption("Upload a CSV, explore its schema, run DuckDB SQL queries, and get AI-powered insights.")
 
-# ── Sidebar — Gemini settings ──────────────────────────────────────────────────
+# ── Sidebar — Mistral settings ──────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
 
-    gemini_api_key = st.text_input(
-        "Gemini API Key",
+    mistral_api_key = st.text_input(
+        "Mistral API Key",
         type="password",
-        placeholder="AIza…",
-        help="Get your key from https://aistudio.google.com/app/apikey",
+        placeholder="your-mistral-api-key",
+        help="Get your key from https://console.mistral.ai/api-keys",
     )
     llm_model = st.selectbox(
         "Model",
-        ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+        ["mistral-large-latest", "mistral-small-latest", "open-mistral-nemo"],
         index=0,
     )
 
@@ -53,12 +53,12 @@ if "profile_json" not in st.session_state:
 if "cleaning_steps" not in st.session_state:
     st.session_state.cleaning_steps = []
 
-# Cache the Gemini client; recreate only when the key changes
-_cached_key = st.session_state.get("gemini_api_key_cached", "")
-if gemini_api_key and gemini_api_key != _cached_key:
-    st.session_state.gemini_client = get_client(gemini_api_key)
-    st.session_state.gemini_api_key_cached = gemini_api_key
-_llm_client = st.session_state.get("gemini_client") if gemini_api_key else None
+# Cache the Mistral client; recreate only when the key changes
+_cached_key = st.session_state.get("mistral_api_key_cached", "")
+if mistral_api_key and mistral_api_key != _cached_key:
+    st.session_state.mistral_client = get_client(mistral_api_key)
+    st.session_state.mistral_api_key_cached = mistral_api_key
+_llm_client = st.session_state.get("mistral_client") if mistral_api_key else None
 
 PREVIEW_ROWS = 100  # configurable default for the preview section
 
@@ -235,8 +235,8 @@ if st.session_state.table_loaded:
     # ── AI Cleaning Suggestions (LLM Handshake) ────────────────────────────────
     st.divider()
     st.subheader("🤖 AI Cleaning Suggestions")
-    if not gemini_api_key:
-        st.info("Enter your API key in the sidebar to enable AI features.")
+    if not mistral_api_key:
+        st.info("Enter your Mistral API key in the sidebar to enable AI features.")
     else:
         if st.button("🔍 Analyse & Suggest Cleaning Steps"):
             with st.spinner("Sending schema to LLM…"):
@@ -280,8 +280,8 @@ if st.session_state.table_loaded:
     # ── Natural Language Query ─────────────────────────────────────────────────
     st.divider()
     st.subheader("💬 Ask a Question About Your Data")
-    if not gemini_api_key:
-        st.info("Enter your API key in the sidebar to enable this feature.")
+    if not mistral_api_key:
+        st.info("Enter your Mistral API key in the sidebar to enable this feature.")
     else:
         nl_question = st.text_input(
             "Question",
@@ -364,8 +364,8 @@ if st.session_state.table_loaded:
     # ── Weekly Report ──────────────────────────────────────────────────────────
     st.divider()
     st.subheader("📅 Generate Weekly Report")
-    if not gemini_api_key:
-        st.info("Enter your API key in the sidebar to enable this feature.")
+    if not mistral_api_key:
+        st.info("Enter your Mistral API key in the sidebar to enable this feature.")
     else:
         if st.button("📋 Generate Weekly Report Template"):
             with st.spinner("Generating report template…"):

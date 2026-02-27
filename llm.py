@@ -1,4 +1,4 @@
-"""LLM integration via Google Gemini: cleaning handshake, NL-to-SQL, and answer formatting."""
+"""LLM integration via Mistral AI: cleaning handshake, NL-to-SQL, and answer formatting."""
 
 import json
 from typing import Any
@@ -63,40 +63,45 @@ _WEEKLY_REPORT_PROMPT = (
 )
 
 
-# ── Gemini client ─────────────────────────────────────────────────────────────
+# ── Mistral client ─────────────────────────────────────────────────────────────
 
-class _GeminiClient:
-    """Thin wrapper around google-generativeai."""
+class _MistralClient:
+    """Thin wrapper around the mistralai SDK."""
 
     def __init__(self, api_key: str) -> None:
-        import google.generativeai as genai  # local import – optional dependency
-        genai.configure(api_key=api_key)
-        self._genai = genai
+        from mistralai import Mistral  # local import – optional dependency
+        self._client = Mistral(api_key=api_key)
 
     def generate(self, model: str, prompt: str, json_mode: bool = False) -> str:
-        generation_config = self._genai.types.GenerationConfig(
-            response_mime_type="application/json" if json_mode else "text/plain",
+        kwargs: dict[str, Any] = {}
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        response = self._client.chat.complete(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            **kwargs,
         )
-        m = self._genai.GenerativeModel(
-            model_name=model,
-            generation_config=generation_config,
-        )
-        return m.generate_content(prompt).text
+        if not response.choices:
+            raise ValueError("Mistral API returned an empty choices list.")
+        content = response.choices[0].message.content
+        if content is None:
+            raise ValueError("Mistral API returned null content.")
+        return content
 
 
-def _call_llm(prompt: str, client: "_GeminiClient", model: str, json_mode: bool = False) -> str:
-    """Call the Gemini LLM and return the raw text response."""
+def _call_llm(prompt: str, client: "_MistralClient", model: str, json_mode: bool = False) -> str:
+    """Call the Mistral LLM and return the raw text response."""
     return client.generate(model=model, prompt=prompt, json_mode=json_mode)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def get_client(api_key: str) -> _GeminiClient:
-    """Create and return a Gemini client."""
-    return _GeminiClient(api_key)
+def get_client(api_key: str) -> _MistralClient:
+    """Create and return a Mistral client."""
+    return _MistralClient(api_key)
 
 
-def llm_handshake(profile: dict, client: _GeminiClient, model: str = "gemini-2.0-flash") -> list[dict]:
+def llm_handshake(profile: dict, client: _MistralClient, model: str = "mistral-large-latest") -> list[dict]:
     """
     Send the profile JSON to the LLM and ask for cleaning steps.
     Returns a list of dicts, each with 'description' and 'sql' keys.
@@ -108,7 +113,7 @@ def llm_handshake(profile: dict, client: _GeminiClient, model: str = "gemini-2.0
     return json.loads(raw).get("steps", [])
 
 
-def nl_to_sql(question: str, profile: dict, client: _GeminiClient, model: str = "gemini-2.0-flash") -> str:
+def nl_to_sql(question: str, profile: dict, client: _MistralClient, model: str = "mistral-large-latest") -> str:
     """Convert a natural language question to a DuckDB SELECT query."""
     prompt = _NL_TO_SQL_PROMPT.format(
         profile_json=json.dumps(profile, indent=2, default=str),
@@ -126,8 +131,8 @@ def format_answer(
     question: str,
     sql: str,
     result_df: pd.DataFrame,
-    client: _GeminiClient,
-    model: str = "gemini-2.0-flash",
+    client: _MistralClient,
+    model: str = "mistral-large-latest",
 ) -> dict[str, Any]:
     """
     Format the SQL result into a structured response.
@@ -143,7 +148,7 @@ def format_answer(
     return json.loads(raw)
 
 
-def generate_weekly_report(profile: dict, client: _GeminiClient, model: str = "gemini-2.0-flash") -> dict[str, Any]:
+def generate_weekly_report(profile: dict, client: _MistralClient, model: str = "mistral-large-latest") -> dict[str, Any]:
     """
     Ask the LLM to produce a structured weekly report template for the dataset.
     Returns a dict with 'summary', 'metrics', and 'quality_notes' keys.
